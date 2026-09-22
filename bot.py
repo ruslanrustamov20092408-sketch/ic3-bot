@@ -1,4 +1,7 @@
 import os
+import asyncio
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton
 )
@@ -13,22 +16,14 @@ if not BOT_TOKEN:
 GROUP_LINK = "https://t.me/+j0dfVujtjmwwODdi"
 
 VIDEOS = [
-    {
-        "caption": "🎥 Certiport.uz sayti orqali ro'yxatdan o'tish",
-        "file_id": "BAACAgEAAxkBAANOarFo6bW14K_y9D38Xp_8rxb35CYAAgkHAAIePThFaYNJPGKMtbk9BA",
-    },
-    {
-        "caption": "🎥 Sertifikatni saytdan yuklab olish",
-        "file_id": "BAACAgEAAxkBAANQarFo_XzM6XKrCLCv4vSlYobrPOIAAlsIAAJyofBFR_wrnzpFVG89BA",
-    },
-    {
-        "caption": "🎥 Sertifikat havolasini yuklab olish",
-        "file_id": "BAACAgEAAxkBAANSarFpBsoHMaDmLCF1Bq8AAYXSknnXAAJYCgACZTt4RRMR4KH9PeorPQQ",
-    },
-    {
-        "caption": "🎥 ERP bazasiga IC3 sertifikatini kiritish",
-        "file_id": "BAACAgIAAxkBAANUarFpGXmTtgABkiIMjnN1zHA91j2aAAIriQACDY2wSHkrrqPlGLNPPQQ",
-    },
+    {"caption": "🎥 Certiport.uz sayti orqali ro'yxatdan o'tish",
+     "file_id": "BAACAgEAAxkBAANOarFo6bW14K_y9D38Xp_8rxb35CYAAgkHAAIePThFaYNJPGKMtbk9BA"},
+    {"caption": "🎥 Sertifikatni saytdan yuklab olish",
+     "file_id": "BAACAgEAAxkBAANQarFo_XzM6XKrCLCv4vSlYobrPOIAAlsIAAJyofBFR_wrnzpFVG89BA"},
+    {"caption": "🎥 Sertifikat havolasini yuklab olish",
+     "file_id": "BAACAgEAAxkBAANSarFpBsoHMaDmLCF1Bq8AAYXSknnXAAJYCgACZTt4RRMR4KH9PeorPQQ"},
+    {"caption": "🎥 ERP bazasiga IC3 sertifikatini kiritish",
+     "file_id": "BAACAgIAAxkBAANUarFpGXmTtgABkiIMjnN1zHA91j2aAAIriQACDY2wSHkrrqPlGLNPPQQ"},
 ]
 
 WELCOME_TEXT = """🎓 IC3 DIGITAL LITERACY
@@ -149,27 +144,34 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
 
 
+# ==== HEALTH CHECK ====
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"OK")
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+    def log_message(self, format, *args):
+        pass
+
+
+def start_health_server():
+    port = int(os.getenv("PORT", "10000"))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    print(f"✅ Health server {port}-portda")
+
+
 def main():
+    start_health_server()
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    PORT = int(os.getenv("PORT", "10000"))
-    RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
-
-    if RENDER_URL:
-        WEBHOOK_PATH = BOT_TOKEN
-        print(f"✅ Webhook rejimida: {RENDER_URL}/{WEBHOOK_PATH}")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            url_path=WEBHOOK_PATH,
-            webhook_url=f"{RENDER_URL}/{WEBHOOK_PATH}",
-            drop_pending_updates=True,
-        )
-    else:
-        print("✅ Polling rejimida...")
-        app.run_polling(drop_pending_updates=True)
+    print("✅ Bot polling rejimida...")
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
