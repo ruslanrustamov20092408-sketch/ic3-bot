@@ -1,4 +1,5 @@
 import os
+import asyncio
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton
 )
@@ -6,14 +7,12 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters, ContextTypes
 )
 
-# ==== TOKEN environment variable dan o'qiladi ====
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN topilmadi! Render'da Environment Variable qo'shing.")
+    raise ValueError("❌ BOT_TOKEN topilmadi!")
 
 GROUP_LINK = "https://t.me/+j0dfVujtjmwwODdi"
 
-# ==== VIDEOLAR ====
 VIDEOS = [
     {
         "caption": "🎥 Certiport.uz sayti orqali ro'yxatdan o'tish",
@@ -33,7 +32,6 @@ VIDEOS = [
     },
 ]
 
-# ---------- MATNLAR ----------
 WELCOME_TEXT = """🎓 IC3 DIGITAL LITERACY
 📘 GLOBAL STANDARD 6
 
@@ -95,7 +93,6 @@ KURS_TEXT = """📚 KURSDA SIZ:
 ✅ IC3 GS6 kitobi
 ✅ Rus va ingliz tilidagi materiallar"""
 
-# ---------- TUGMALAR ----------
 BTN_ADMIN   = "👨‍💼 Admin Bilan Bog'lanmoqchiman"
 BTN_IMTIHON = "📝 Imtihonda qanday qatnashsam bo'ladi?"
 BTN_KURS    = "📚 Kursda nimalarni o'rganaman?"
@@ -117,7 +114,6 @@ def main_keyboard():
     )
 
 
-# ---------- HANDLERLAR ----------
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         WELCOME_TEXT,
@@ -131,19 +127,15 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if text == BTN_ADMIN:
         await update.message.reply_text(ADMIN_TEXT, disable_web_page_preview=True)
-
     elif text == BTN_IMTIHON:
         await update.message.reply_text(IMTIHON_TEXT, disable_web_page_preview=True)
-
     elif text == BTN_KURS:
         await update.message.reply_text(KURS_TEXT)
-
     elif text == BTN_GROUP:
         await update.message.reply_text(
             f"➕ Guruhga qo'shilish uchun quyidagi havolani bosing:\n\n👉 {GROUP_LINK}",
             disable_web_page_preview=False,
         )
-
     elif text == BTN_VIDEOS:
         await update.message.reply_text("🎥 Foydali videolar:")
         for v in VIDEOS:
@@ -151,7 +143,6 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 video=v["file_id"],
                 caption=v["caption"],
             )
-
     else:
         await update.message.reply_text(
             "Iltimos, pastdagi tugmalardan birini tanlang 👇",
@@ -159,30 +150,37 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# ---------- ISHGA TUSHIRISH (Render Web Service uchun) ----------
-PORT = int(os.getenv("PORT", "10000"))
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
-
-def main():
+async def run_bot():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    if RENDER_EXTERNAL_URL:
-        # Render'da ishlayapti — webhook rejimi
+    PORT = int(os.getenv("PORT", "10000"))
+    RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
+
+    if RENDER_URL:
+        # Render'da — webhook
         WEBHOOK_PATH = f"/{BOT_TOKEN}"
-        WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}"
-        print(f"✅ Bot webhook rejimida ishga tushdi: {WEBHOOK_URL}")
-        app.run_webhook(
+        WEBHOOK_URL = f"{RENDER_URL}{WEBHOOK_PATH}"
+        await app.bot.set_webhook(url=WEBHOOK_URL)
+        print(f"✅ Webhook o'rnatildi: {WEBHOOK_URL}")
+        await app.run_webhook(
             listen="0.0.0.0",
             port=PORT,
             url_path=WEBHOOK_PATH,
             webhook_url=WEBHOOK_URL,
         )
     else:
-        # Lokal kompyuterda — polling rejimi
-        print("✅ Bot polling rejimida ishga tushdi...")
-        app.run_polling()
+        # Lokal kompyuterda — polling
+        print("✅ Polling rejimida ishga tushdi...")
+        await app.run_polling()
+
+
+def main():
+    try:
+        asyncio.run(run_bot())
+    except (KeyboardInterrupt, SystemExit):
+        pass
 
 
 if __name__ == "__main__":
