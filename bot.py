@@ -1,5 +1,4 @@
 import os
-import asyncio
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton
 )
@@ -150,7 +149,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
 
 
-async def run_bot():
+def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -159,28 +158,18 @@ async def run_bot():
     RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
 
     if RENDER_URL:
-        # Render'da — webhook
-        WEBHOOK_PATH = f"/{BOT_TOKEN}"
-        WEBHOOK_URL = f"{RENDER_URL}{WEBHOOK_PATH}"
-        await app.bot.set_webhook(url=WEBHOOK_URL)
-        print(f"✅ Webhook o'rnatildi: {WEBHOOK_URL}")
-        await app.run_webhook(
+        WEBHOOK_PATH = BOT_TOKEN
+        print(f"✅ Webhook rejimida: {RENDER_URL}/{WEBHOOK_PATH}")
+        app.run_webhook(
             listen="0.0.0.0",
             port=PORT,
             url_path=WEBHOOK_PATH,
-            webhook_url=WEBHOOK_URL,
+            webhook_url=f"{RENDER_URL}/{WEBHOOK_PATH}",
+            drop_pending_updates=True,
         )
     else:
-        # Lokal kompyuterda — polling
-        print("✅ Polling rejimida ishga tushdi...")
-        await app.run_polling()
-
-
-def main():
-    try:
-        asyncio.run(run_bot())
-    except (KeyboardInterrupt, SystemExit):
-        pass
+        print("✅ Polling rejimida...")
+        app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
